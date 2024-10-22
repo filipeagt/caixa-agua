@@ -69,6 +69,7 @@ void loop() {
   int level = 100 - distance; //Sensor posicionado a 1 metro (100cm) do fundo do reservatório
   Serial.println("nível: "+ level);
   itoa(level, nivel, 10); //Converte int para char* para envio via MQTT
+  MQTT.publish(TOPIC_INSTANT, nivel); //envia apenas o nível atual
 
   if (tempo % 1800 == 0) { //A cada 1800 segundos ou meia hora   
 
@@ -78,14 +79,14 @@ void loop() {
     } else if (nMedidas < 336){ //Do segundo em diante até 336
       nMedidas++;
       dados = dados.substring(0, dados.length()-1) + ",{\"time\":" + tempo + ",\"level\":" + level + "}]"; //Remove o ']' e add mais um objeto
-    } else {
+    } else { //Depois do 366...
       int primeiraVirgula = dados.indexOf(',');
       int segundaVirgula = dados.indexOf(',',primeiraVirgula); //Localiza o índice do separador entre o primeiro e segundo objeto
       dados = String("[") + dados.substring(segundaVirgula + 1, dados.length()-1) + ",{\"time\":" + tempo + ",\"level\":" + level + "}]"; //Remove o objeto mais antigo e add um novo a lista
     }
-    enviaValores();
+    enviaValores(); //Envia o Array de objetos
   }
-  MQTT.publish(TOPIC_INSTANT, nivel); //envia apenas o nível atual
+
   delay(1000);//Espera 1 segundo
   
 }
