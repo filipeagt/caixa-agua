@@ -13,8 +13,7 @@ const char* BROKER_MQTT = "test.mosquitto.org"; //URL do broker MQTT que se dese
 int BROKER_PORT = 1883;                      // Porta do Broker MQTT
 
 #define ID_MQTT  "Sensor_caixa_de_agua_do_Lameu_esp8266" //Informe um ID unico e seu. Caso sejam usados IDs repetidos a ultima conexão irá sobrepor a anterior. 
-#define TOPIC_HISTORY "water/tank/level/history"    //Tópico para os dados históricos semanais
-#define TOPIC_INSTANT "water/tank/level/instant"    //Tópico para os dados instantâneos
+#define TOPIC_PUBLISH "water/tank/level"    //Tópico único
 PubSubClient MQTT(wifiClient);        // Instancia o Cliente MQTT passando o objeto espClient
 
 String dados;
@@ -69,7 +68,7 @@ void loop() {
   int level = 100 - distance; //Sensor posicionado a 1 metro (100cm) do fundo do reservatório
   Serial.println("nível: "+ level);
   itoa(level, nivel, 10); //Converte int para char* para envio via MQTT
-  MQTT.publish(TOPIC_INSTANT, nivel); //envia apenas o nível atual
+  MQTT.publish(TOPIC_PUBLISH, nivel); //envia apenas o nível atual
 
   if (tempo % 1800 == 0) { //A cada 1800 segundos ou meia hora   
 
@@ -140,7 +139,7 @@ void conectaMQTT() {
 
 void enviaValores() {
       
-  MQTT.publish(TOPIC_HISTORY, (uint8_t*)dados.c_str(), dados.length(), true); //Envia os dados com a flag retain habilitada (true)
+  MQTT.publish(TOPIC_PUBLISH, (uint8_t*)dados.c_str(), dados.length(), true); //Envia os dados com a flag retain habilitada (true)
   Serial.println(dados);        
 
 }
