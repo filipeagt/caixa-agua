@@ -139,8 +139,8 @@ void conectaMQTT() {
 }
 
 void enviaValores() {
-       
-  MQTT.publish(TOPIC_HISTORY, dados.c_str());
+      
+  MQTT.publish(TOPIC_HISTORY, (uint8_t*)dados.c_str(), dados.length(), true); //Envia os dados com a flag retain habilitada (true)
   Serial.println(dados);        
 
 }
