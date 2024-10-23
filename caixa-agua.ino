@@ -29,7 +29,7 @@ int distance; //distância medida
 
 //Obter hora na internet
 WiFiUDP udp;//Cria um objeto "UDP".
-NTPClient ntp(udp, "a.st1.ntp.br", -3 * 3600, 60000);//Cria um objeto "NTP" com as configurações.
+NTPClient ntp(udp, "a.st1.ntp.br", 0 * 3600, 60000);//Cria um objeto "NTP" com as configurações.
 
 unsigned long tempo;//Váriavel que armazenara os segundos desde de 1970
 
@@ -74,6 +74,7 @@ void loop() {
 
     //Gera o Array de Objetos JSON
     if (nMedidas == 0) {
+      nMedidas++;
       dados = String("[{\"time\":") + tempo + ",\"level\":" + level + "}]"; //Primeiro objeto JSON no Array
     } else if (nMedidas < 336){ //Do segundo em diante até 336
       nMedidas++;
@@ -86,7 +87,7 @@ void loop() {
     enviaValores(); //Envia o Array de objetos
   }
 
-  delay(1000);//Espera 1 segundo
+  delay(5000);//Espera 5 segundos
   
 }
 
