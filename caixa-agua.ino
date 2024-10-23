@@ -62,6 +62,8 @@ void loop() {
 
   //Lógica principal, tranformar em fução mais tarde
   tempo = ntp.getEpochTime();
+  int minutos = ntp.getMinutes();
+  int minutosAnt = 59;
 
   //Atulaliza os dados
   medeDistancia();
@@ -70,8 +72,8 @@ void loop() {
   itoa(level, nivel, 10); //Converte int para char* para envio via MQTT
   MQTT.publish(TOPIC_PUBLISH, nivel); //envia apenas o nível atual
 
-  if (tempo % 1800 == 0) { //A cada 1800 segundos ou meia hora   
-
+  if (minutos % 30 == 0 && minutos != minutosAnt) { //A cada meia hora envia os dados
+    minutosAnt = minutos;
     //Gera o Array de Objetos JSON
     if (nMedidas == 0) {
       nMedidas++;
