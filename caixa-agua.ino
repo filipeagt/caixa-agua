@@ -32,6 +32,8 @@ WiFiUDP udp;//Cria um objeto "UDP".
 NTPClient ntp(udp, "a.st1.ntp.br", 0 * 3600, 60000);//Cria um objeto "NTP" com as configurações.
 
 unsigned long tempo;//Váriavel que armazenara os segundos desde de 1970
+int minutosAnt = 59;  //salva o minuto do último envio de JSON para enviar somente uma vez a a cada meia hora
+int minutos = 0; //Armazena o minuto atual 
 
 //Declaração das Funções
 void mantemConexoes();  //Garante que as conexoes com WiFi e MQTT Broker se mantenham ativas
@@ -62,9 +64,8 @@ void loop() {
 
   //Lógica principal, tranformar em fução mais tarde
   tempo = ntp.getEpochTime();
-  int minutos = ntp.getMinutes();
-  int minutosAnt = 59;
-
+  minutos = ntp.getMinutes();
+  
   //Atulaliza os dados
   medeDistancia();
   int level = 100 - distance; //Sensor posicionado a 1 metro (100cm) do fundo do reservatório
