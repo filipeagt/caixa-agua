@@ -51,6 +51,7 @@ void setup() {
 
   conectaWiFi();
   MQTT.setServer(BROKER_MQTT, BROKER_PORT);
+  MQTT.setBufferSize(16384); //Para enviar mensagens maiores
 
   ntp.begin();//Inicia o NTP.
   ntp.forceUpdate();//Força o Update.   
@@ -69,7 +70,7 @@ void loop() {
   //Atulaliza os dados
   medeDistancia();
   int level = 100 - distance; //Sensor posicionado a 1 metro (100cm) do fundo do reservatório
-  Serial.println("nível: "+ level);
+  //Serial.println("nível: "+ level);
   itoa(level, nivel, 10); //Converte int para char* para envio via MQTT
   MQTT.publish(TOPIC_PUBLISH, nivel); //envia apenas o nível atual
 
@@ -83,9 +84,8 @@ void loop() {
       nMedidas++;
       dados = dados.substring(0, dados.length()-1) + ",{\"time\":" + tempo + ",\"level\":" + level + "}]"; //Remove o ']' e add mais um objeto
     } else { //Depois do 366...
-      int primeiraVirgula = dados.indexOf(',');
-      int segundaVirgula = dados.indexOf(',',primeiraVirgula); //Localiza o índice do separador entre o primeiro e segundo objeto
-      dados = String("[") + dados.substring(segundaVirgula + 1, dados.length()-1) + ",{\"time\":" + tempo + ",\"level\":" + level + "}]"; //Remove o objeto mais antigo e add um novo a lista
+      int fechaChave = dados.indexOf('}'); //Localiza o índice do fechamento do primeiro objeto
+      dados = String("[") + dados.substring(fechaChave + 2, dados.length()-1) + ",{\"time\":" + tempo + ",\"level\":" + level + "}]"; //Remove o objeto mais antigo e add um novo a lista
     }
     enviaValores(); //Envia o Array de objetos
   }
@@ -144,7 +144,7 @@ void conectaMQTT() {
 void enviaValores() {
       
   MQTT.publish(TOPIC_PUBLISH, (uint8_t*)dados.c_str(), dados.length(), true); //Envia os dados com a flag retain habilitada (true)
-  Serial.println(dados);        
+  //Serial.println(dados);        
 
 }
 
@@ -158,4 +158,3 @@ void medeDistancia() {
   duration = pulseIn(echoPin, HIGH); //Retorna o tempo que a onda trafegou
   distance = duration * 0.034 / 2; //* Velocidade do som dividida por 2 (ida e volta)
 }
-
