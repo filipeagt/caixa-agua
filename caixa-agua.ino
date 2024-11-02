@@ -14,11 +14,14 @@ int BROKER_PORT = 1883;                      // Porta do Broker MQTT
 
 #define ID_MQTT  "Sensor_caixa_de_agua_do_Lameu_esp8266" //Informe um ID unico e seu. Caso sejam usados IDs repetidos a ultima conexão irá sobrepor a anterior. 
 #define TOPIC_PUBLISH "water/tank/level"    //Tópico único
+#define TOPIC_SUBSCRIBE "water/tank/level"
 PubSubClient MQTT(wifiClient);        // Instancia o Cliente MQTT passando o objeto espClient
 
 String dados;
 char nivel[4];
+int level = 0;
 int nMedidas = 0; //Número de medidas realizadas
+bool inicio = true; //Variável auxiliar para capturar os dados apena uma vez na inicialização
 
 //Conexão do sensor
 #define echoPin 0
@@ -40,8 +43,10 @@ void mantemConexoes();  //Garante que as conexoes com WiFi e MQTT Broker se mant
 void conectaWiFi();     //Faz conexão com WiFi
 void conectaMQTT();     //Faz conexão com Broker MQTT
 void enviaValores();     //
-
+void recebePacote(char* topic, byte* payload, unsigned int length);
 void medeDistancia();
+void gerencia();
+void medeNivel();
 
 void setup() {
   pinMode(trigPin, OUTPUT);
@@ -52,6 +57,7 @@ void setup() {
   conectaWiFi();
   MQTT.setServer(BROKER_MQTT, BROKER_PORT);
   MQTT.setBufferSize(16384); //Para enviar mensagens maiores
+  MQTT.setCallback(recebePacote);
 
   ntp.begin();//Inicia o NTP.
   ntp.forceUpdate();//Força o Update.   
@@ -63,31 +69,10 @@ void loop() {
   
   MQTT.loop();
 
-  //Lógica principal, tranformar em fução mais tarde
-  tempo = ntp.getEpochTime();
-  minutos = ntp.getMinutes();
-  
-  //Atulaliza os dados
-  medeDistancia();
-  int level = 100 - distance; //Sensor posicionado a 1 metro (100cm) do fundo do reservatório
-  //Serial.println("nível: "+ level);
-  itoa(level, nivel, 10); //Converte int para char* para envio via MQTT
-  MQTT.publish(TOPIC_PUBLISH, nivel); //envia apenas o nível atual
-
-  if (minutos % 30 == 0 && minutos != minutosAnt) { //A cada meia hora envia os dados
-    minutosAnt = minutos;
-    //Gera o Array de Objetos JSON
-    if (nMedidas == 0) {
-      nMedidas++;
-      dados = String("[{\"time\":") + tempo + ",\"level\":" + level + "}]"; //Primeiro objeto JSON no Array
-    } else if (nMedidas < 336){ //Do segundo em diante até 336
-      nMedidas++;
-      dados = dados.substring(0, dados.length()-1) + ",{\"time\":" + tempo + ",\"level\":" + level + "}]"; //Remove o ']' e add mais um objeto
-    } else { //Depois do 366...
-      int fechaChave = dados.indexOf('}'); //Localiza o índice do fechamento do primeiro objeto
-      dados = String("[") + dados.substring(fechaChave + 2, dados.length()-1) + ",{\"time\":" + tempo + ",\"level\":" + level + "}]"; //Remove o objeto mais antigo e add um novo a lista
-    }
-    enviaValores(); //Envia o Array de objetos
+  if (!inicio) { //Só é executado depois de ter recebibido um pacote 
+    gerencia();
+  } else {
+    medeNivel(); //Para garantir que vai ter pelo menos um dado no tópico
   }
 
   delay(5000);//Espera 5 segundos
@@ -132,6 +117,7 @@ void conectaMQTT() {
         Serial.println(BROKER_MQTT);
         if (MQTT.connect(ID_MQTT)) {
             Serial.println("Conectado ao Broker com sucesso!");
+            MQTT.subscribe(TOPIC_SUBSCRIBE);
         } 
         else {
             Serial.println("Não foi possivel se conectar ao broker.");
@@ -157,4 +143,55 @@ void medeDistancia() {
   digitalWrite(trigPin, LOW);
   duration = pulseIn(echoPin, HIGH); //Retorna o tempo que a onda trafegou
   distance = duration * 0.034 / 2; //* Velocidade do som dividida por 2 (ida e volta)
+}
+
+void gerencia() {
+  //Lógica principal, tranformar em fução mais tarde
+  tempo = ntp.getEpochTime();
+  minutos = ntp.getMinutes();
+  
+  //Atulaliza os dados
+  medeNivel();
+
+  if (minutos % 30 == 0 && minutos != minutosAnt) { //A cada meia hora envia os dados
+    minutosAnt = minutos;
+    //Gera o Array de Objetos JSON
+    if (nMedidas == 0) {
+      nMedidas++;
+      dados = String("[{\"time\":") + tempo + ",\"level\":" + level + "}]"; //Primeiro objeto JSON no Array
+    } else if (nMedidas < 336){ //Do segundo em diante até 336
+      nMedidas++;
+      dados = dados.substring(0, dados.length()-1) + ",{\"time\":" + tempo + ",\"level\":" + level + "}]"; //Remove o ']' e add mais um objeto
+    } else { //Depois do 366...
+      int fechaChave = dados.indexOf('}'); //Localiza o índice do fechamento do primeiro objeto
+      dados = String("[") + dados.substring(fechaChave + 2, dados.length()-1) + ",{\"time\":" + tempo + ",\"level\":" + level + "}]"; //Remove o objeto mais antigo e add um novo a lista
+    }
+    enviaValores(); //Envia o Array de objetos
+  }
+}
+
+void recebePacote(char* topic, byte* payload, unsigned int length) 
+{  
+  if ((char)payload[0] == '[' && inicio) { //Se o pacote for um Array e estiver na inicilização do esp    
+    for(int i = 0; i < length; i++) //obtem a string do payload recebido
+    {
+       char c = (char)payload[i];
+       dados += c;
+       if (c == '}') { //Conta o número de objetos no Array
+         nMedidas++;
+       }
+    }
+    
+  } 
+  inicio = false; //Seta inicio para false para garantir que não vai mais entrar neste loop 
+  Serial.println(dados);
+  MQTT.unsubscribe(TOPIC_SUBSCRIBE);
+}
+
+void medeNivel() {
+  medeDistancia();
+  level = 100 - distance; //Sensor posicionado a 1 metro (100cm) do fundo do reservatório
+  //Serial.println("nível: "+ level);
+  itoa(level, nivel, 10); //Converte int para char* para envio via MQTT
+  MQTT.publish(TOPIC_PUBLISH, nivel); //envia apenas o nível atual
 }
