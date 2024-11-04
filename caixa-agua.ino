@@ -13,8 +13,7 @@ const char* BROKER_MQTT = "test.mosquitto.org"; //URL do broker MQTT que se dese
 int BROKER_PORT = 1883;                      // Porta do Broker MQTT
 
 #define ID_MQTT  "Sensor_caixa_de_agua_do_Lameu_esp8266" //Informe um ID unico e seu. Caso sejam usados IDs repetidos a ultima conexão irá sobrepor a anterior. 
-#define TOPIC_PUBLISH "water/tank/level"    //Tópico único
-#define TOPIC_SUBSCRIBE "water/tank/level"
+#define TOPIC_PUB_SUB "water/tank/level"    //Tópico único
 PubSubClient MQTT(wifiClient);        // Instancia o Cliente MQTT passando o objeto espClient
 
 String dados;
@@ -24,8 +23,8 @@ int nMedidas = 0; //Número de medidas realizadas
 bool inicio = true; //Variável auxiliar para capturar os dados apena uma vez na inicialização
 
 //Conexão do sensor
-#define echoPin 0
-#define trigPin 2
+#define echoPin 3 //Conectar por um resistor de 1k para limitar a corrente no boot, ao ligar o pino3 inicia em high
+#define trigPin 1 //0,1 e 2 se conecatdos a LOW na inicialização da falha no boot, então o esp não iniciliza se ligados no echo
 
 long duration; //tempo que q onda trafega
 int distance; //distância medida
@@ -117,7 +116,7 @@ void conectaMQTT() {
         Serial.println(BROKER_MQTT);
         if (MQTT.connect(ID_MQTT)) {
             Serial.println("Conectado ao Broker com sucesso!");
-            MQTT.subscribe(TOPIC_SUBSCRIBE);
+            MQTT.subscribe(TOPIC_PUB_SUB);
         } 
         else {
             Serial.println("Não foi possivel se conectar ao broker.");
@@ -129,7 +128,7 @@ void conectaMQTT() {
 
 void enviaValores() {
       
-  MQTT.publish(TOPIC_PUBLISH, (uint8_t*)dados.c_str(), dados.length(), true); //Envia os dados com a flag retain habilitada (true)
+  MQTT.publish(TOPIC_PUB_SUB, (uint8_t*)dados.c_str(), dados.length(), true); //Envia os dados com a flag retain habilitada (true)
   //Serial.println(dados);        
 
 }
@@ -146,11 +145,10 @@ void medeDistancia() {
 }
 
 void gerencia() {
-  //Lógica principal, tranformar em fução mais tarde
+  //Atulaliza os dados
   tempo = ntp.getEpochTime();
   minutos = ntp.getMinutes();
   
-  //Atulaliza os dados
   medeNivel();
 
   if (minutos % 30 == 0 && minutos != minutosAnt) { //A cada meia hora envia os dados
@@ -166,13 +164,14 @@ void gerencia() {
       int fechaChave = dados.indexOf('}'); //Localiza o índice do fechamento do primeiro objeto
       dados = String("[") + dados.substring(fechaChave + 2, dados.length()-1) + ",{\"time\":" + tempo + ",\"level\":" + level + "}]"; //Remove o objeto mais antigo e add um novo a lista
     }
+    delay(200); //Tempo para estabilizar os dados na memória
     enviaValores(); //Envia o Array de objetos
   }
 }
 
 void recebePacote(char* topic, byte* payload, unsigned int length) 
 {  
-  if ((char)payload[0] == '[' && inicio) { //Se o pacote for um Array e estiver na inicilização do esp    
+  if ((char)payload[0] == '[' && inicio && (char)payload[length-1] == ']') { //Se o pacote for um Array e estiver na inicilização do esp    
     for(int i = 0; i < length; i++) //obtem a string do payload recebido
     {
        char c = (char)payload[i];
@@ -185,7 +184,7 @@ void recebePacote(char* topic, byte* payload, unsigned int length)
   } 
   inicio = false; //Seta inicio para false para garantir que não vai mais entrar neste loop 
   Serial.println(dados);
-  MQTT.unsubscribe(TOPIC_SUBSCRIBE);
+  MQTT.unsubscribe(TOPIC_PUB_SUB);
 }
 
 void medeNivel() {
@@ -193,5 +192,5 @@ void medeNivel() {
   level = 100 - distance; //Sensor posicionado a 1 metro (100cm) do fundo do reservatório
   //Serial.println("nível: "+ level);
   itoa(level, nivel, 10); //Converte int para char* para envio via MQTT
-  MQTT.publish(TOPIC_PUBLISH, nivel); //envia apenas o nível atual
+  MQTT.publish(TOPIC_PUB_SUB, nivel); //envia apenas o nível atual
 }
