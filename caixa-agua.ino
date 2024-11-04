@@ -164,8 +164,9 @@ void gerencia() {
       int fechaChave = dados.indexOf('}'); //Localiza o índice do fechamento do primeiro objeto
       dados = String("[") + dados.substring(fechaChave + 2, dados.length()-1) + ",{\"time\":" + tempo + ",\"level\":" + level + "}]"; //Remove o objeto mais antigo e add um novo a lista
     }
-    delay(200); //Tempo para estabilizar os dados na memória
+    delay(250); //Tempo para estabilizar os dados na memória
     enviaValores(); //Envia o Array de objetos
+    delay(250);
   }
 }
 
